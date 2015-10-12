@@ -1,0 +1,31 @@
+{
+  "name": "angular-premiere",
+  "version": "0.1.0",
+  "description": "Premiere service for AngularJS",
+  "authors": [
+    "Codemill <info@codemill.se>"
+  ],
+  "main": [
+    "deps/CSInterface-6.0.0.js",
+    "jsx/ppro.jsx",
+    "index.js"
+  ],
+  "keywords": [
+    "angular"
+  ],
+  "private": true,
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular": "~1.4.7"
+  },
+  "devDependencies": {
+    "angular-mocks": "~1.4.7"
+  }
+}
