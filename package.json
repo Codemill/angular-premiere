@@ -1,6 +1,6 @@
 {
   "name": "angular-premiere",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Premiere service for AngularJS",
   "main": "index.js",
   "scripts": {
