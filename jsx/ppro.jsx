@@ -111,12 +111,18 @@ function renderSequence(presetPath, outputPath) {
 }
 
 function getActiveSequence() {
+  var data = {
+    id : null,
+    name : null
+  };
   app.enableQE();
   var activeSequence = qe.project.getActiveSequence();
-  var data = {
-    'id' : activeSequence.guid,
-    'name' : activeSequence.name
-  };
+  if (activeSequence) {
+    data = {
+      'id': activeSequence.guid,
+      'name': activeSequence.name
+    };
+  }
   return JSON.stringify(data);
 }
 

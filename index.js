@@ -85,6 +85,17 @@ angular.module('codemill.premiere', [])
         return dir;
       };
 
+      var checkActiveSequenceAndRun = function (script, deferred, callback) {
+        evalCSScript('getActiveSequence()', function (sequence) {
+          var seq = JSON.parse(sequence);
+          if (seq.id === null || seq.id === undefined) {
+            deferred.reject('No active sequence');
+          } else {
+            evalCSScript(script, callback);
+          }
+        });
+      };
+
       this.renderActiveSequence = function (dirName) {
         var deferred = $q.defer();
         var outputPath = getOutputDirectory(dirName);
@@ -101,9 +112,12 @@ angular.module('codemill.premiere', [])
           };
           $timeout(iterationFunc, 250);
         } else {
-          csInterface.evalScript('renderSequence(' + variableAsString(null) + ', ' + variableAsString(outputPath) + ')', function (jobID) {
-            registerJob(jobID, deferred);
-          });
+          checkActiveSequenceAndRun(
+            'renderSequence(' + variableAsString(null) + ', ' + variableAsString(outputPath) + ')',
+            deferred,
+            function (jobID) {
+              registerJob(jobID, deferred);
+            });
         }
         return deferred.promise;
       };
@@ -111,7 +125,7 @@ angular.module('codemill.premiere', [])
       this.clearSequenceMarkers = function () {
         var deferred = $q.defer();
         if (hostAvailable) {
-          evalCSScript('clearSequenceMarkers()', function() {
+          checkActiveSequenceAndRun('clearSequenceMarkers()', deferred, function () {
             deferred.resolve();
           });
         } else {
@@ -124,42 +138,46 @@ angular.module('codemill.premiere', [])
         $log.info('Markers: ', markers);
         var deferred = $q.defer();
         if (hostAvailable) {
-          evalCSScript('createSequenceMarkers(' + variableAsString(JSON.stringify(markers)) + ')', function() {
-            deferred.resolve();
-          });
+          checkActiveSequenceAndRun(
+            'createSequenceMarkers(' + variableAsString(JSON.stringify(markers)) + ')',
+            deferred,
+            function () {
+              deferred.resolve();
+            });
         } else {
           deferred.resolve();
         }
         return deferred.promise;
       };
 
-      var guid = function() {
+      var guid = function () {
         function s4() {
           return Math.floor((1 + Math.random()) * 0x10000)
             .toString(16)
             .substring(1);
         }
+
         return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
           s4() + '-' + s4() + s4() + s4();
       };
 
-      this.getActiveSequence = function() {
+      this.getActiveSequence = function () {
         var deferred = $q.defer();
         if (hostAvailable) {
-          evalCSScript('getActiveSequence()', function(sequence) {
+          evalCSScript('getActiveSequence()', function (sequence) {
             $log.info('sequence', sequence);
-            deferred.resolve(sequence);
+            deferred.resolve(JSON.parse(sequence));
           });
         } else {
           deferred.resolve({
-            'id' : guid(),
-            'name' : 'Sequence name'
+            'id': guid(),
+            'name': 'Sequence name'
           });
         }
         return deferred.promise;
       };
 
-      this.isHostAvailable = function() {
+      this.isHostAvailable = function () {
         return hostAvailable;
       };
 
