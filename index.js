@@ -41,7 +41,7 @@ angular.module('codemill.premiere', [])
                 deferred.notify(event.data.progress * 100);
                 break;
               case 'complete':
-                $log.info('File from host: ', typeof(event.data.outputFilePath));
+                $log.info('File from host: ', event.data.outputFilePath);
                 deferred.resolve(event.data.outputFilePath);
                 unregisterJob(jobID);
                 break;
@@ -135,7 +135,6 @@ angular.module('codemill.premiere', [])
       };
 
       this.createSequenceMarkers = function (markers) {
-        $log.info('Markers: ', markers);
         var deferred = $q.defer();
         if (hostAvailable) {
           checkActiveSequenceAndRun(
@@ -165,7 +164,6 @@ angular.module('codemill.premiere', [])
         var deferred = $q.defer();
         if (hostAvailable) {
           evalCSScript('getActiveSequence()', function (sequence) {
-            $log.info('sequence', sequence);
             deferred.resolve(JSON.parse(sequence));
           });
         } else {
