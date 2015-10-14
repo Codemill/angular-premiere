@@ -113,7 +113,7 @@ angular.module('codemill.premiere', [])
           $timeout(iterationFunc, 250);
         } else {
           checkActiveSequenceAndRun(
-            'renderSequence(' + variableAsString(null) + ', ' + variableAsString(outputPath) + ')',
+            'renderSequence(' + variableAsString(config.preset) + ', ' + variableAsString(outputPath) + ')',
             deferred,
             function (jobID) {
               registerJob(jobID, deferred);
