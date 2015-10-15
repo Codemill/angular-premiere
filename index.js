@@ -2,8 +2,8 @@
 'use strict';
 
 angular.module('codemill.premiere', [])
-  .service('cmPremiereService', ['$window', '$q', '$log', 'Premiere', '$timeout',
-    function ($window, $q, $log, config, $timeout) {
+  .service('cmPremiereService', ['$window', '$q', '$log', '$timeout',
+    function ($window, $q, $log, $timeout) {
 
       var csInterface = new CSInterface();
       var hostAvailable = typeof(csInterface.openURLInDefaultBrowser) !== 'undefined';
@@ -96,9 +96,10 @@ angular.module('codemill.premiere', [])
         });
       };
 
-      this.renderActiveSequence = function (dirName) {
+      this.renderActiveSequence = function (presetPath, outputDirName, outputInMyDocuments) {
         var deferred = $q.defer();
-        var outputPath = getOutputDirectory(dirName);
+        outputInMyDocuments = typeof outputInMyDocuments !== 'undefined' ? outputInMyDocuments : true;
+        var outputPath = outputInMyDocuments ? getOutputDirectory(outputDirName) : outputDirName;
         if (!hostAvailable) {
           var iteration = 0;
           var iterationFunc = function () {
@@ -113,7 +114,7 @@ angular.module('codemill.premiere', [])
           $timeout(iterationFunc, 250);
         } else {
           checkActiveSequenceAndRun(
-            'renderSequence(' + variableAsString(config.preset) + ', ' + variableAsString(outputPath) + ')',
+            'renderSequence(' + variableAsString(presetPath) + ', ' + variableAsString(outputPath) + ')',
             deferred,
             function (jobID) {
               registerJob(jobID, deferred);

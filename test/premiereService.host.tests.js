@@ -20,7 +20,7 @@ describe('codemill.premiere.cmPremiereService', function () {
       };
 
       this.getSystemPath = function() {
-        return "/tmp/";
+        return "/tmp";
       };
 
       this.addEventListener = function(type, callback) {
@@ -162,12 +162,38 @@ describe('codemill.premiere.cmPremiereService', function () {
   it('renderActiveSequence should resolve with correct filename', function() {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
-    service.renderActiveSequence('Wipster').then(success).finally(null, notify);
+    service.renderActiveSequence(null, 'Test').then(success).finally(null, notify);
     goodSequence();
     result(12);
-    event({ jobID : 12, type : 'complete', outputFilePath : '/tmp/Wipster/test.mp4'});
+    event({ jobID : 12, type : 'complete', outputFilePath : '/tmp/Test/test.mp4'});
     scope.$digest();
-    expect(success).toHaveBeenCalledWith('/tmp/Wipster/test.mp4');
+    expect(evalScriptStr).toContain('/tmp/Test/');
+    expect(success).toHaveBeenCalledWith('/tmp/Test/test.mp4');
+  });
+
+  it('renderActiveSequence with full output path should resolve with correct filename', function() {
+    var success = jasmine.createSpy('success');
+    var notify = jasmine.createSpy('notify');
+    service.renderActiveSequence(null, '/test/Test/', false).then(success).finally(null, notify);
+    goodSequence();
+    result(12);
+    event({ jobID : 12, type : 'complete', outputFilePath : '/test/Test/test.mp4'});
+    scope.$digest();
+    expect(evalScriptStr).toContain('/test/Test/');
+    expect(success).toHaveBeenCalledWith('/test/Test/test.mp4');
+  });
+
+  it('renderActiveSequence with preset path set should send preset path to CSInterface', function() {
+    var success = jasmine.createSpy('success');
+    var notify = jasmine.createSpy('notify');
+    service.renderActiveSequence('/preset/Test.prf', 'Test').then(success).finally(null, notify);
+    goodSequence();
+    result(12);
+    event({ jobID : 12, type : 'complete', outputFilePath : '/tmp/Test/test.mp4'});
+    scope.$digest();
+    expect(evalScriptStr).toContain('/tmp/Test/');
+    expect(evalScriptStr).toContain('/preset/Test.prf');
+    expect(success).toHaveBeenCalledWith('/tmp/Test/test.mp4');
   });
 
   // renderActiveSequence
@@ -175,7 +201,7 @@ describe('codemill.premiere.cmPremiereService', function () {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
     var error = jasmine.createSpy('error');
-    service.renderActiveSequence('Wipster').then(success).finally(null, notify).catch(error);
+    service.renderActiveSequence(null, 'Test').then(success).finally(null, notify).catch(error);
     badSequence();
     scope.$digest();
     expect(success).not.toHaveBeenCalled();
@@ -187,7 +213,7 @@ describe('codemill.premiere.cmPremiereService', function () {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
     var error = jasmine.createSpy('error');
-    service.renderActiveSequence('Wipster').then(success).finally(null, notify).catch(error);
+    service.renderActiveSequence(null, 'Test').then(success).finally(null, notify).catch(error);
     goodSequence();
     result(12);
     event({ jobID : 12, type : 'error', error : 'Bad stuff'});
@@ -200,14 +226,15 @@ describe('codemill.premiere.cmPremiereService', function () {
   it('renderActiveSequence should call notify for progress events', function() {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
-    service.renderActiveSequence('Wipster').then(success).finally(null, notify);
+    service.renderActiveSequence(null, 'Test').then(success).finally(null, notify);
     goodSequence();
     result(12);
     event({ jobID : 12, type : 'progress', progress : 0.1 });
-    event({ jobID : 12, type : 'complete', outputFilePath : '/tmp/Wipster/test.mp4'});
+    event({ jobID : 12, type : 'complete', outputFilePath : '/tmp/Test/test.mp4'});
     scope.$digest();
     expect(notify).toHaveBeenCalledWith(10);
-    expect(success).toHaveBeenCalledWith('/tmp/Wipster/test.mp4');
+    expect(evalScriptStr).toContain('/tmp/Test/');
+    expect(success).toHaveBeenCalledWith('/tmp/Test/test.mp4');
   });
 
 });
