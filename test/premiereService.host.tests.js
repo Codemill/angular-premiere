@@ -186,13 +186,13 @@ describe('codemill.premiere.cmPremiereService', function () {
   it('renderActiveSequence with preset path set should send preset path to CSInterface', function() {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
-    service.renderActiveSequence('/preset/Test.prf', 'Test').then(success).finally(null, notify);
+    service.renderActiveSequence('/preset/Test.epr', 'Test').then(success).finally(null, notify);
     goodSequence();
     result(12);
     event({ jobID : 12, type : 'complete', outputFilePath : '/tmp/Test/test.mp4'});
     scope.$digest();
     expect(evalScriptStr).toContain('/tmp/Test/');
-    expect(evalScriptStr).toContain('/preset/Test.prf');
+    expect(evalScriptStr).toContain('/preset/Test.epr');
     expect(success).toHaveBeenCalledWith('/tmp/Test/test.mp4');
   });
 
