@@ -67,22 +67,59 @@ angular.module('codemill.premiere', [])
         }
       };
 
-      var getOutputDirectory = function (dirName) {
+      var getBase = function(pathType) {
+        if (!hostAvailable) {
+          if (pathType === undefined || pathType === null) {
+            pathType = 'documents';
+          }
+          return '/tmp/' + pathType + '/';
+        } else {
+          var type;
+          switch(pathType) {
+            case 'documents':
+                  type = SystemPath.MY_DOCUMENTS;
+                  break;
+            case 'extension':
+                  type = SystemPath.EXTENSION;
+                  break;
+            case 'userdata':
+                  type = SystemPath.USER_DATA;
+                  break;
+            default:
+                  type = SystemPath.MY_DOCUMENTS;
+                  break;
+          }
+          return csInterface.getSystemPath(type) + pathSeparator();
+        }
+      };
+
+      var getFilePath = function (config) {
+        if (config === undefined || config === null) {
+          return config;
+        }
         var base = null;
-        if (hostAvailable) {
-          base = csInterface.getSystemPath(SystemPath.MY_DOCUMENTS) + pathSeparator();
-        } else {
-          base = '/tmp/';
+        switch(config.pathType) {
+          case 'null':
+                return null;
+          case 'full':
+                return config.filePath;
+          default:
+                base = getBase(config.pathType);
+                break;
         }
-        var dir = base + dirName;
+        var filePath = base + config.filePath;
         if (hostAvailable) {
-          cep.fs.makedir(dir);
-          dir += pathSeparator();
-        } else {
-          dir += '/';
+          cep.fs.makedir(filePath);
         }
-        $log.info('Directory ' + dir);
-        return dir;
+        if (!config.isFile) {
+          if (hostAvailable) {
+            filePath += pathSeparator();
+          } else {
+            filePath += '/';
+          }
+        }
+        $log.info('File path ' + filePath);
+        return filePath;
       };
 
       var checkActiveSequenceAndRun = function (script, deferred, callback) {
@@ -96,10 +133,10 @@ angular.module('codemill.premiere', [])
         });
       };
 
-      this.renderActiveSequence = function (presetPath, outputDirName, outputInMyDocuments) {
+      this.renderActiveSequence = function (config) {
         var deferred = $q.defer();
-        outputInMyDocuments = typeof outputInMyDocuments !== 'undefined' ? outputInMyDocuments : true;
-        var outputPath = outputInMyDocuments ? getOutputDirectory(outputDirName) : outputDirName;
+        var outputPath = getFilePath(config.output);
+        var presetPath = getFilePath(config.preset);
         if (!hostAvailable) {
           var iteration = 0;
           var iterationFunc = function () {

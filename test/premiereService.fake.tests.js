@@ -67,7 +67,7 @@ describe('codemill.premiere.cmPremiereService', function () {
   it('renderActiveSequence should resolve with correct filename', function() {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
-    service.renderActiveSequence(null, 'Test').then(success).finally(null, notify);
+    service.renderActiveSequence({ output : { filePath : 'Test' }}).then(success).finally(null, notify);
     scope.$digest();
     $timeout.flush();
     $timeout.flush();
@@ -81,13 +81,13 @@ describe('codemill.premiere.cmPremiereService', function () {
     $timeout.flush();
     $timeout.flush();
     expect(notify.calls.count()).toBe(10);
-    expect(success).toHaveBeenCalledWith('/tmp/Test/test.mp4');
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
   it('renderActiveSequence with full output path set should return correct filename', function() {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
-    service.renderActiveSequence(null, '/test/Test/', false).then(success).finally(null, notify);
+    service.renderActiveSequence({ output : { filePath : '/test/Test/', pathType : 'full'}}).then(success).finally(null, notify);
     scope.$digest();
     $timeout.flush();
     $timeout.flush();
@@ -102,5 +102,65 @@ describe('codemill.premiere.cmPremiereService', function () {
     $timeout.flush();
     expect(notify.calls.count()).toBe(10);
     expect(success).toHaveBeenCalledWith('/test/Test/test.mp4');
+  });
+
+  it('renderActiveSequence with extension output path set should return correct filename', function() {
+    var success = jasmine.createSpy('success');
+    var notify = jasmine.createSpy('notify');
+    service.renderActiveSequence({ output : { filePath : 'Test', pathType : 'extension'}}).then(success).finally(null, notify);
+    scope.$digest();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    expect(notify.calls.count()).toBe(10);
+    expect(success).toHaveBeenCalledWith('/tmp/extension/Test/test.mp4');
+  });
+
+  it('renderActiveSequence with extension output path set should return correct filename', function() {
+    var success = jasmine.createSpy('success');
+    var notify = jasmine.createSpy('notify');
+    service.renderActiveSequence({ output : { filePath : 'Test', pathType : 'documents'}}).then(success).finally(null, notify);
+    scope.$digest();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    expect(notify.calls.count()).toBe(10);
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
+  });
+
+  it('renderActiveSequence with extension output path set should return correct filename', function() {
+    var success = jasmine.createSpy('success');
+    var notify = jasmine.createSpy('notify');
+    service.renderActiveSequence({ output : { filePath : 'Test', pathType : 'userdata'}}).then(success).finally(null, notify);
+    scope.$digest();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    $timeout.flush();
+    expect(notify.calls.count()).toBe(10);
+    expect(success).toHaveBeenCalledWith('/tmp/userdata/Test/test.mp4');
   });
 });
