@@ -217,4 +217,11 @@ angular.module('codemill.premiere', [])
         return hostAvailable;
       };
 
+      this.openDirectoryDialog = function(title, initialPath) {
+        if (hostAvailable) {
+          return cep.fs.showOpenDialog(false, true, title, initialPath);
+        }
+        return '';
+      };
+
     }]);
