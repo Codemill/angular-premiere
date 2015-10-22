@@ -27,7 +27,7 @@ angular.module('codemill.premiere', [])
       }
 
       if (hostAvailable) {
-        csInterface.addEventListener('io.wipster.ppro.RenderEvent', function (event) {
+        csInterface.addEventListener('se.codemill.ppro.RenderEvent', function (event) {
           var jobID = event.data.jobID;
           if (jobID in jobs) {
             var deferred = jobs[jobID];

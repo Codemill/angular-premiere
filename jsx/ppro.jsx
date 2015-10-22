@@ -28,7 +28,7 @@ function renderSequence(presetPath, outputPath) {
       loadPluginLib();
       var eventObj = new CSXSEvent();
 
-      eventObj.type = "io.wipster.ppro.RenderEvent";
+      eventObj.type = "se.codemill.ppro.RenderEvent";
       eventObj.data = JSON.stringify({
         'type': 'complete',
         'jobID': jobID,
@@ -41,7 +41,7 @@ function renderSequence(presetPath, outputPath) {
       loadPluginLib();
       var eventObj = new CSXSEvent();
 
-      eventObj.type = "io.wipster.ppro.RenderEvent";
+      eventObj.type = "se.codemill.ppro.RenderEvent";
       eventObj.data = JSON.stringify({
         'type': 'error',
         'jobID': jobID,
@@ -54,7 +54,7 @@ function renderSequence(presetPath, outputPath) {
       loadPluginLib();
       var eventObj = new CSXSEvent();
 
-      eventObj.type = "io.wipster.ppro.RenderEvent";
+      eventObj.type = "se.codemill.ppro.RenderEvent";
       eventObj.data = JSON.stringify({
         'type': 'progress',
         'jobID': jobID,
