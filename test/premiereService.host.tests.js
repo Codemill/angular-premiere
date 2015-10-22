@@ -30,7 +30,8 @@ describe('codemill.premiere.cmPremiereService', function () {
       this.evalScript = function (script, callback) {
         evalScriptStr = script;
         evalCallback = callback;
-      }
+      };
+
     };
 
     SystemPath = {
@@ -41,7 +42,8 @@ describe('codemill.premiere.cmPremiereService', function () {
 
     cep = {
       fs: {
-        makedir: jasmine.createSpy('makedir')
+        makedir: jasmine.createSpy('makedir'),
+        showOpenDialog : jasmine.createSpy('showOpenDialog')
       }
     };
 
@@ -375,6 +377,14 @@ describe('codemill.premiere.cmPremiereService', function () {
     expect(notify).toHaveBeenCalledWith(10);
     expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
     expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+  });
+
+  it('openDirectoryDialog should call showOpenDialog', function() {
+    cep.fs.showOpenDialog.and.callFake(function() { return { data : [], err : 1}});
+    var result = service.openDirectoryDialog('Test', '/path');
+    expect(cep.fs.showOpenDialog).toHaveBeenCalledWith(false, true, 'Test', '/path');
+    expect(result.data.length).toBe(0);
+    expect(result.err).toBe(1);
   });
 
 });
