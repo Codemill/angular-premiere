@@ -1,97 +1,153 @@
 describe('codemill.premiere.cmPremiereService', function () {
 
-  var service, exceptionHandler, scope;
-  var openURLInDefaultBrowser = jasmine.createSpy('openURLInDefaultBrowser');
-  var eventCallback = null, evalCallback = null;
-  var evalScriptStr = null;
-  var config = {};
+  var service, exceptionHandler, scope, $q, eventCallback;
+  var spy = {
+    openURLInDefaultBrowser : null,
+    getFilePath : null,
+    callCS : null,
+    openDirectoryDialog : null,
+    registerEventListener : null
+  };
+  var promise = {};
+
+  var spies = function() {
+    for (var f in spy) {
+      if (spy.hasOwnProperty(f)) {
+        spy[f] = jasmine.createSpy(f);
+      }
+    }
+  };
+
+  function pFake(spy) {
+    var deferred = $q.defer();
+    spy.and.callFake(function () {
+      return deferred.promise;
+    });
+    return deferred;
+  }
+
+  var promises = function() {
+    promise.openURLInDefaultBrowser = pFake(spy.openURLInDefaultBrowser);
+    promise.callCS = pFake(spy.callCS);
+  };
+
+  function pResolve(deferred, data) {
+    deferred.resolve(data);
+    scope.$apply();
+  }
+
+  angular.module('codemill.adobe', []);
 
   beforeEach(module('codemill.premiere'));
 
   beforeEach(module(function ($provide) {
-    config = {};
-    $provide.value('Premiere', config);
-
-    CSInterface = function () {
-      this.openURLInDefaultBrowser = openURLInDefaultBrowser;
-
-      this.getOSInformation = function () {
-        return "Mac";
-      };
-
-      this.getSystemPath = function (type) {
-        return "/tmp/" + type;
-      };
-
-      this.addEventListener = function (type, callback) {
-        eventCallback = callback;
-      };
-
-      this.evalScript = function (script, callback) {
-        evalScriptStr = script;
-        evalCallback = callback;
-      };
-
-    };
-
-    SystemPath = {
-      MY_DOCUMENTS: 'MY_DOCUMENTS',
-      EXTENSION: 'EXTENSION',
-      USER_DATA: 'USER_DATA'
-    };
-
-    cep = {
-      fs: {
-        makedir: jasmine.createSpy('makedir'),
-        showOpenDialog : jasmine.createSpy('showOpenDialog')
+    spies();
+    spy.getFilePath.and.callFake(function(input) {
+      if (input === null || input === undefined) {
+        return input;
       }
-    };
-
+      if (input.pathType === 'full') {
+        return input.filePath;
+      }
+      if (input.pathType === 'null') {
+        return null;
+      }
+      if (input.pathType === 'undefined') {
+        return undefined;
+      }
+      return '/tmp/' + (input.pathType ? input.pathType : 'documents') + '/' + input.filePath + (input.isFile ? '' : '/');
+    });
+    eventCallback = undefined;
+    spy.registerEventListener.and.callFake(function(id, callback) {
+      eventCallback = callback;
+    });
+    $provide.service('cmAdobeService', function() {
+      this.isHostAvailable = function() { return true; };
+      this.registerEventListener = spy.registerEventListener;
+      this.openURLInDefaultBrowser = spy.openURLInDefaultBrowser;
+      this.callCS = spy.callCS;
+      this.openDirectoryDialog = spy.openDirectoryDialog;
+      this.getFilePath = spy.getFilePath;
+    });
   }));
 
   beforeEach(module(function ($exceptionHandlerProvider) {
     $exceptionHandlerProvider.mode('log');
   }));
 
-  beforeEach(inject(function (_cmPremiereService_, $exceptionHandler, _$rootScope_) {
+  beforeEach(inject(function (_cmPremiereService_, $exceptionHandler, _$rootScope_, _$q_) {
     service = _cmPremiereService_;
     exceptionHandler = $exceptionHandler;
     scope = _$rootScope_;
+    $q = _$q_;
+    promises();
   }));
 
   var defaultRenderConfig = {output: {filePath: 'Test'}};
 
-  var result = function (data) {
-    var call = evalCallback;
-    if (call !== null) {
-      evalCallback = null;
-      call(JSON.stringify(data));
+  var compareObject = function(result, expected) {
+    if (expected === null) {
+      expect(result).toBeNull();
+    } else if (expected === undefined) {
+      expect(result).not.toBeDefined();
+    } else {
+      expect(typeof(result)).toBe(typeof(expected));
+      switch (typeof(expected)) {
+        case 'object':
+          for (var f in expected) {
+            if (expected.hasOwnProperty(f)) {
+              compareObject(result[f], expected[f]);
+            }
+          }
+          break;
+        case 'array':
+          expect(result.length).toBe(expected.length);
+          for (var i = 0; i < expected.length; i++) {
+            compareObject(result[i], expected[i]);
+          }
+          break;
+        default:
+          expect(result).toBe(expected);
+          break;
+      }
     }
   };
 
-  var event = function (data) {
-    if (eventCallback !== null) {
+  var result = function(method, args, data, isObject, resetPromise) {
+    expect(spy.callCS).toHaveBeenCalled();
+    expect(spy.callCS.calls.mostRecent().args[0].method).toBe(method);
+    compareObject(spy.callCS.calls.mostRecent().args[0].args, args);
+    if (isObject) {
+      expect(spy.callCS.calls.mostRecent().args[0].returnIsObject).toBe(true);
+    }
+    spy.callCS.calls.reset();
+    var p = promise.callCS;
+    if (resetPromise) {
+      promise.callCS = pFake(spy.callCS);
+    }
+    pResolve(p, data);
+  };
+
+  var goodSequence = function() {
+    result('getActiveSequence', undefined, { id : '1234', name : 'Test sequence name' }, true, true);
+  };
+
+  var badSequence = function() {
+    result('getActiveSequence', undefined, { id : null, name : null }, true, true);
+  };
+
+  var event = function(data) {
+    if (eventCallback) {
       eventCallback({data: data});
+      scope.$digest();
     }
-  };
-
-  var goodSequence = function () {
-    result({"id": "1234", "name": "Test sequence name"});
-  };
-
-  var badSequence = function () {
-    result({"id": null, "name": null});
   };
 
   it('should be initialized', function () {
     expect(!!service).toBe(true);
-    expect(service.isHostAvailable()).toBe(true);
-  });
-
-  // openURLInDefaultBrowser
-  it('openURLInDefaultBrowser tries to launch url in $window', function () {
-    service.openURLInDefaultBrowser('http://test.com');
-    expect(openURLInDefaultBrowser).toHaveBeenCalledWith('http://test.com');
+    expect(spy.registerEventListener).toHaveBeenCalled();
+    expect(spy.registerEventListener.calls.argsFor(0)[0]).toBe('se.codemill.ppro.RenderEvent');
+    expect(eventCallback).toBeDefined();
   });
 
   // getActiveSequence
@@ -99,7 +155,6 @@ describe('codemill.premiere.cmPremiereService', function () {
     var handler = jasmine.createSpy('success');
     service.getActiveSequence().then(handler);
     goodSequence();
-    scope.$digest();
     expect(handler).toHaveBeenCalled();
     expect(handler.calls.mostRecent().args[0].name).toBe('Test sequence name');
     expect(handler.calls.mostRecent().args[0].id).toBe('1234');
@@ -110,8 +165,7 @@ describe('codemill.premiere.cmPremiereService', function () {
     var handler = jasmine.createSpy('success');
     service.clearSequenceMarkers().then(handler);
     goodSequence();
-    result(); // to return clear marker result
-    scope.$digest();
+    result('clearSequenceMarkers'); // to return clear marker result
     expect(handler).toHaveBeenCalled();
   });
 
@@ -120,7 +174,6 @@ describe('codemill.premiere.cmPremiereService', function () {
     var error = jasmine.createSpy('error');
     service.clearSequenceMarkers().then(handler).catch(error);
     badSequence();
-    scope.$digest();
     expect(handler).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith('No active sequence');
   });
@@ -130,10 +183,8 @@ describe('codemill.premiere.cmPremiereService', function () {
     var handler = jasmine.createSpy('success');
     service.createSequenceMarkers([]).then(handler);
     goodSequence();
-    result(); // to return create marker result
-    scope.$digest();
+    result('createSequenceMarkers', [[]]); // to return create marker result
     expect(handler).toHaveBeenCalled();
-    expect(evalScriptStr).toBe('createSequenceMarkers(\'' + JSON.stringify([]) + '\')');
   });
 
   it('createSequenceMarkers should have marker parameter set correctly', function () {
@@ -148,10 +199,8 @@ describe('codemill.premiere.cmPremiereService', function () {
     ];
     service.createSequenceMarkers(markers).then(handler);
     goodSequence();
-    result(); // to return create marker result
-    scope.$digest();
+    result('createSequenceMarkers', [markers]); // to return create marker result
     expect(handler).toHaveBeenCalled();
-    expect(evalScriptStr).toBe('createSequenceMarkers(\'' + JSON.stringify(markers) + '\')');
   });
 
   it('createSequenceMarkers should reject for bad sequence', function () {
@@ -159,7 +208,6 @@ describe('codemill.premiere.cmPremiereService', function () {
     var error = jasmine.createSpy('error');
     service.createSequenceMarkers().then(handler).catch(error);
     badSequence();
-    scope.$digest();
     expect(handler).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith('No active sequence');
   });
@@ -170,14 +218,12 @@ describe('codemill.premiere.cmPremiereService', function () {
     var notify = jasmine.createSpy('notify');
     service.renderActiveSequence(defaultRenderConfig).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    result('renderSequence', [undefined, '/tmp/documents/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
-  it('renderActiveSequence should resolve with correct filename', function () {
+  it('renderActiveSequence should resolve with correct filename for documents', function () {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
     service.renderActiveSequence({
@@ -187,14 +233,12 @@ describe('codemill.premiere.cmPremiereService', function () {
       }
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    result('renderSequence', [undefined, '/tmp/documents/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
-  it('renderActiveSequence should resolve with correct filename', function () {
+  it('renderActiveSequence should resolve with correct filename for extension', function () {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
     service.renderActiveSequence({
@@ -204,31 +248,12 @@ describe('codemill.premiere.cmPremiereService', function () {
       }
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/EXTENSION/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/EXTENSION/Test/');
-    expect(success).toHaveBeenCalledWith('/tmp/EXTENSION/Test/test.mp4');
+    result('renderSequence', [undefined, '/tmp/extension/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/extension/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/extension/Test/test.mp4');
   });
 
-  it('renderActiveSequence should resolve with correct filename', function () {
-    var success = jasmine.createSpy('success');
-    var notify = jasmine.createSpy('notify');
-    service.renderActiveSequence({
-      output: {
-        filePath: 'Test',
-        pathType: 'userdata'
-      }
-    }).then(success).finally(null, notify);
-    goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/USER_DATA/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/USER_DATA/Test/');
-    expect(success).toHaveBeenCalledWith('/tmp/USER_DATA/Test/test.mp4');
-  });
-
-  it('renderActiveSequence should resolve with correct filename', function () {
+  it('renderActiveSequence should resolve with correct filename for full', function () {
     var success = jasmine.createSpy('success');
     var notify = jasmine.createSpy('notify');
     service.renderActiveSequence({
@@ -238,10 +263,8 @@ describe('codemill.premiere.cmPremiereService', function () {
       }
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
+    result('renderSequence', [undefined, '/test/Test/'], 12);
     event({jobID: 12, type: 'complete', outputFilePath: '/test/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/test/Test/');
     expect(success).toHaveBeenCalledWith('/test/Test/test.mp4');
   });
 
@@ -253,12 +276,9 @@ describe('codemill.premiere.cmPremiereService', function () {
       preset: {filePath: '/preset/Test.epr', pathType: 'full', isFile: true}
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(evalScriptStr).toContain('/preset/Test.epr');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    result('renderSequence', ['/preset/Test.epr', '/tmp/documents/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
   it('renderActiveSequence with preset path set to null should not send preset path to CSInterface', function () {
@@ -269,12 +289,9 @@ describe('codemill.premiere.cmPremiereService', function () {
       preset: {pathType : 'null'}
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(evalScriptStr).toContain('null');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    result('renderSequence', [null, '/tmp/documents/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
   it('renderActiveSequence with preset path set should send preset path to CSInterface', function () {
@@ -285,12 +302,9 @@ describe('codemill.premiere.cmPremiereService', function () {
       preset: {filePath: 'Test.epr', isFile: true}
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test.epr');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    result('renderSequence', ['/tmp/documents/Test.epr', '/tmp/documents/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
   it('renderActiveSequence with preset path set should send preset path to CSInterface', function () {
@@ -301,12 +315,9 @@ describe('codemill.premiere.cmPremiereService', function () {
       preset: {filePath: 'Test.epr', pathType: 'documents', isFile: true}
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test.epr');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    result('renderSequence', ['/tmp/documents/Test.epr', '/tmp/documents/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
   it('renderActiveSequence with preset path set should send preset path to CSInterface', function () {
@@ -317,12 +328,9 @@ describe('codemill.premiere.cmPremiereService', function () {
       preset: {filePath: 'Test.epr', pathType: 'extension', isFile: true}
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(evalScriptStr).toContain('/tmp/EXTENSION/Test.epr');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    result('renderSequence', ['/tmp/extension/Test.epr', '/tmp/documents/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
   it('renderActiveSequence with preset path set should send preset path to CSInterface', function () {
@@ -333,12 +341,9 @@ describe('codemill.premiere.cmPremiereService', function () {
       preset: {filePath: 'Test.epr', pathType: 'userdata', isFile: true}
     }).then(success).finally(null, notify);
     goodSequence();
-    result(12);
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(evalScriptStr).toContain('/tmp/USER_DATA/Test.epr');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    result('renderSequence', ['/tmp/userdata/Test.epr', '/tmp/documents/Test/'], 12);
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
   it('renderActiveSequence should reject for no active sequence', function () {
@@ -347,7 +352,6 @@ describe('codemill.premiere.cmPremiereService', function () {
     var error = jasmine.createSpy('error');
     service.renderActiveSequence(defaultRenderConfig).then(success).finally(null, notify).catch(error);
     badSequence();
-    scope.$digest();
     expect(success).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith('No active sequence');
   });
@@ -358,9 +362,8 @@ describe('codemill.premiere.cmPremiereService', function () {
     var error = jasmine.createSpy('error');
     service.renderActiveSequence(defaultRenderConfig).then(success).finally(null, notify).catch(error);
     goodSequence();
-    result(12);
+    result('renderSequence', [undefined, '/tmp/documents/Test/'], 12);
     event({jobID: 12, type: 'error', error: 'Bad stuff'});
-    scope.$digest();
     expect(success).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith('Failed rendering sequence');
   });
@@ -370,21 +373,12 @@ describe('codemill.premiere.cmPremiereService', function () {
     var notify = jasmine.createSpy('notify');
     service.renderActiveSequence(defaultRenderConfig).then(success).finally(null, notify);
     goodSequence();
-    result(12);
+    result('renderSequence', [undefined, '/tmp/documents/Test/'], 12);
     event({jobID: 12, type: 'progress', progress: 0.1});
-    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/MY_DOCUMENTS/Test/test.mp4'});
-    scope.$digest();
+    event({jobID: 12, type: 'complete', outputFilePath: '/tmp/documents/Test/test.mp4'});
     expect(notify).toHaveBeenCalledWith(10);
-    expect(evalScriptStr).toContain('/tmp/MY_DOCUMENTS/Test/');
-    expect(success).toHaveBeenCalledWith('/tmp/MY_DOCUMENTS/Test/test.mp4');
+    expect(success).toHaveBeenCalledWith('/tmp/documents/Test/test.mp4');
   });
 
-  it('openDirectoryDialog should call showOpenDialog', function() {
-    cep.fs.showOpenDialog.and.callFake(function() { return { data : [], err : 1}});
-    var result = service.openDirectoryDialog('Test', '/path');
-    expect(cep.fs.showOpenDialog).toHaveBeenCalledWith(false, true, 'Test', '/path');
-    expect(result.data.length).toBe(0);
-    expect(result.err).toBe(1);
-  });
 
 });

@@ -1,143 +1,92 @@
-/* globals CSInterface, cep, SystemPath */
 'use strict';
 
-angular.module('codemill.premiere', [])
-  .service('cmPremiereService', ['$window', '$q', '$log', '$timeout',
-    function ($window, $q, $log, $timeout) {
+angular.module('codemill.premiere', ['codemill.adobe'])
+  .service('cmPremiereService', ['$q', '$log', '$timeout', 'cmAdobeService',
+    function ($q, $log, $timeout, adobeService) {
 
-      var csInterface = new CSInterface();
-      var hostAvailable = typeof(csInterface.openURLInDefaultBrowser) !== 'undefined';
       var jobs = {};
 
-      function evalCSScript(script, callback) {
-        csInterface.evalScript(script, callback);
-      }
-
-      function variableAsString(variable) {
-        return variable === undefined ? 'undefined' :
-          (variable === null ? 'null' : '\'' + variable + '\'');
-      }
-
-      function registerJob(jobID, process) {
-        jobs[jobID] = process;
+      function registerJob(jobID, deferred) {
+        jobs[jobID] = deferred;
       }
 
       function unregisterJob(jobID) {
         delete jobs[jobID];
       }
 
-      if (hostAvailable) {
-        csInterface.addEventListener('se.codemill.ppro.RenderEvent', function (event) {
-          var jobID = event.data.jobID;
-          if (jobID in jobs) {
-            var deferred = jobs[jobID];
-            switch (event.data.type) {
-              case 'error':
-                $log.error('Failed rendering sequence', event.data.error);
-                deferred.reject('Failed rendering sequence');
-                unregisterJob(jobID);
-                break;
-              case 'progress':
-                deferred.notify(event.data.progress * 100);
-                break;
-              case 'complete':
-                $log.info('File from host: ', event.data.outputFilePath);
-                deferred.resolve(event.data.outputFilePath);
-                unregisterJob(jobID);
-                break;
-            }
-          }
-        });
+      function renderSequence(presetPath, outputPath) {
+        return { method : 'renderSequence', args : [presetPath, outputPath]};
       }
 
-      this.openURLInDefaultBrowser = function (url) {
-        if (hostAvailable) {
-          csInterface.openURLInDefaultBrowser(url);
+      function getActiveSequence() {
+        return { method : 'getActiveSequence', returnIsObject : true };
+      }
+
+      function clearSequenceMarkers() {
+        return { method : 'clearSequenceMarkers' };
+      }
+
+      function createSequenceMarkers(markers) {
+        return { method : 'createSequenceMarkers', args : [markers] };
+      }
+
+      function handleRenderEvent(event) {
+        var jobID = event.data.jobID;
+        if (jobID in jobs) {
+          var deferred = jobs[jobID];
+          switch (event.data.type) {
+            case 'error':
+              $log.error('Failed rendering sequence', event.data.error);
+              deferred.reject('Failed rendering sequence');
+              unregisterJob(jobID);
+              break;
+            case 'progress':
+              deferred.notify(event.data.progress * 100);
+              break;
+            case 'complete':
+              $log.info('File from host: ', event.data.outputFilePath);
+              deferred.resolve(event.data.outputFilePath);
+              unregisterJob(jobID);
+              break;
+          }
+        }
+      }
+
+      if (adobeService.isHostAvailable()) {
+        adobeService.registerEventListener('se.codemill.ppro.RenderEvent', handleRenderEvent);
+      }
+
+      function runWithActiveSequenceCheck(callOpts) {
+        if (adobeService.isHostAvailable()) {
+          var deferred = $q.defer();
+          adobeService.callCS(getActiveSequence())
+            .then(function (sequence) {
+              if (sequence === null || sequence === undefined || sequence.id === null || sequence.id === undefined) {
+                deferred.reject('No active sequence');
+              } else {
+                adobeService.callCS(callOpts)
+                  .then(function (data) {
+                    deferred.resolve(data);
+                  })
+                  .catch(function (error) {
+                    deferred.reject(error);
+                  });
+              }
+            })
+            .catch(function (error) {
+              deferred.reject(error);
+            });
+          return deferred.promise;
         } else {
-          $window.open(url);
+          return $q.when();
         }
-      };
-
-      var pathSeparator = function () {
-        var OSVersion = csInterface.getOSInformation();
-        if (OSVersion.indexOf('Mac') >= 0) {
-          return '/';
-        } else {
-          return '\\';
-        }
-      };
-
-      var getBase = function(pathType) {
-        if (!hostAvailable) {
-          if (pathType === undefined || pathType === null) {
-            pathType = 'documents';
-          }
-          return '/tmp/' + pathType + '/';
-        } else {
-          var type;
-          switch(pathType) {
-            case 'documents':
-                  type = SystemPath.MY_DOCUMENTS;
-                  break;
-            case 'extension':
-                  type = SystemPath.EXTENSION;
-                  break;
-            case 'userdata':
-                  type = SystemPath.USER_DATA;
-                  break;
-            default:
-                  type = SystemPath.MY_DOCUMENTS;
-                  break;
-          }
-          return csInterface.getSystemPath(type) + pathSeparator();
-        }
-      };
-
-      var getFilePath = function (config) {
-        if (config === undefined || config === null) {
-          return config;
-        }
-        var base = null;
-        switch(config.pathType) {
-          case 'null':
-                return null;
-          case 'full':
-                return config.filePath;
-          default:
-                base = getBase(config.pathType);
-                break;
-        }
-        var filePath = base + config.filePath;
-        if (hostAvailable) {
-          cep.fs.makedir(filePath);
-        }
-        if (!config.isFile) {
-          if (hostAvailable) {
-            filePath += pathSeparator();
-          } else {
-            filePath += '/';
-          }
-        }
-        $log.info('File path ' + filePath);
-        return filePath;
-      };
-
-      var checkActiveSequenceAndRun = function (script, deferred, callback) {
-        evalCSScript('getActiveSequence()', function (sequence) {
-          var seq = JSON.parse(sequence);
-          if (seq.id === null || seq.id === undefined) {
-            deferred.reject('No active sequence');
-          } else {
-            evalCSScript(script, callback);
-          }
-        });
-      };
+      }
 
       this.renderActiveSequence = function (config) {
         var deferred = $q.defer();
-        var outputPath = getFilePath(config.output);
-        var presetPath = getFilePath(config.preset);
-        if (!hostAvailable) {
+        var outputPath = adobeService.getFilePath(config.output);
+        var presetPath = adobeService.getFilePath(config.preset);
+        if (!adobeService.isHostAvailable()) {
           var iteration = 0;
           var iterationFunc = function () {
             if (iteration >= 10) {
@@ -150,41 +99,23 @@ angular.module('codemill.premiere', [])
           };
           $timeout(iterationFunc, 250);
         } else {
-          checkActiveSequenceAndRun(
-            'renderSequence(' + variableAsString(presetPath) + ', ' + variableAsString(outputPath) + ')',
-            deferred,
-            function (jobID) {
+          runWithActiveSequenceCheck(renderSequence(presetPath, outputPath))
+            .then(function(jobID) {
               registerJob(jobID, deferred);
+            })
+            .catch(function(error) {
+              deferred.reject(error);
             });
         }
         return deferred.promise;
       };
 
       this.clearSequenceMarkers = function () {
-        var deferred = $q.defer();
-        if (hostAvailable) {
-          checkActiveSequenceAndRun('clearSequenceMarkers()', deferred, function () {
-            deferred.resolve();
-          });
-        } else {
-          deferred.resolve();
-        }
-        return deferred.promise;
+        return runWithActiveSequenceCheck(clearSequenceMarkers());
       };
 
       this.createSequenceMarkers = function (markers) {
-        var deferred = $q.defer();
-        if (hostAvailable) {
-          checkActiveSequenceAndRun(
-            'createSequenceMarkers(' + variableAsString(JSON.stringify(markers)) + ')',
-            deferred,
-            function () {
-              deferred.resolve();
-            });
-        } else {
-          deferred.resolve();
-        }
-        return deferred.promise;
+        return runWithActiveSequenceCheck(createSequenceMarkers(markers));
       };
 
       var guid = function () {
@@ -199,29 +130,14 @@ angular.module('codemill.premiere', [])
       };
 
       this.getActiveSequence = function () {
-        var deferred = $q.defer();
-        if (hostAvailable) {
-          evalCSScript('getActiveSequence()', function (sequence) {
-            deferred.resolve(JSON.parse(sequence));
-          });
+        if (adobeService.isHostAvailable()) {
+          return adobeService.callCS(getActiveSequence());
         } else {
-          deferred.resolve({
+          return $q.when({
             'id': guid(),
             'name': 'Sequence name'
           });
         }
-        return deferred.promise;
-      };
-
-      this.isHostAvailable = function () {
-        return hostAvailable;
-      };
-
-      this.openDirectoryDialog = function(title, initialPath) {
-        if (hostAvailable) {
-          return cep.fs.showOpenDialog(false, true, title, initialPath);
-        }
-        return '';
       };
 
     }]);

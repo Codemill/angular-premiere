@@ -1,18 +1,43 @@
 describe('codemill.premiere.cmPremiereService', function () {
 
-  var service, exceptionHandler, scope, open, $timeout;
-  var config = {};
+  var service, exceptionHandler, scope, $timeout;
 
+  var spy = {
+    openURLInDefaultBrowser : null,
+    getFilePath : null,
+    callCS : null,
+    openDirectoryDialog : null
+  };
+
+  var spies = function() {
+    for (var f in spy) {
+      if (spy.hasOwnProperty(f)) {
+        spy[f] = jasmine.createSpy(f);
+      }
+    }
+  };
+
+  angular.module('codemill.adobe', []);
   beforeEach(module('codemill.premiere'));
 
   beforeEach(module(function ($provide) {
-    config = {};
-    $provide.value('Premiere', config);
-    open = jasmine.createSpy('open');
-    $provide.value('$window', {
-      open: open
+    spies();
+    spy.getFilePath.and.callFake(function(input) {
+      if (input === null || input === undefined) {
+        return input;
+      }
+      if (input.pathType === 'full') {
+        return input.filePath;
+      }
+      return '/tmp/' + (input.pathType ? input.pathType : 'documents') + '/' + input.filePath + (input.isFile ? '' : '/');
     });
-    CSInterface = function() {}
+    $provide.service('cmAdobeService', function() {
+      this.isHostAvailable = function() { return false; };
+      this.openURLInDefaultBrowser = spy.openURLInDefaultBrowser;
+      this.callCS = spy.callCS;
+      this.openDirectoryDialog = spy.openDirectoryDialog;
+      this.getFilePath = spy.getFilePath;
+    });
   }));
 
   beforeEach(module(function ($exceptionHandlerProvider) {
@@ -28,23 +53,17 @@ describe('codemill.premiere.cmPremiereService', function () {
 
   it('should be initialized', function () {
     expect(!!service).toBe(true);
-    expect(service.isHostAvailable()).toBe(false);
   });
 
   // getActiveSequence
   it('getActiveSequence should return fake sequence', function () {
     var handler = jasmine.createSpy('success');
     service.getActiveSequence().then(handler);
+    expect(spy.callCS).not.toHaveBeenCalled();
     scope.$digest();
     expect(handler).toHaveBeenCalled();
     expect(handler.calls.mostRecent().args[0].name).toBe('Sequence name');
     expect(handler.calls.mostRecent().args[0].id).toBeDefined();
-  });
-
-  // openURLInDefaultBrowser
-  it('openURLInDefaultBrowser tries to launch url in $window', function () {
-    service.openURLInDefaultBrowser('http://test.com');
-    expect(open).toHaveBeenCalledWith('http://test.com');
   });
 
   // clearSequenceMarkers
@@ -53,6 +72,7 @@ describe('codemill.premiere.cmPremiereService', function () {
     service.clearSequenceMarkers().then(handler);
     scope.$digest();
     expect(handler).toHaveBeenCalled();
+    expect(spy.callCS).not.toHaveBeenCalled();
   });
 
   // createSequenceMarkers
@@ -61,6 +81,7 @@ describe('codemill.premiere.cmPremiereService', function () {
     service.createSequenceMarkers([]).then(handler);
     scope.$digest();
     expect(handler).toHaveBeenCalled();
+    expect(spy.callCS).not.toHaveBeenCalled();
   });
 
   // renderActiveSequence

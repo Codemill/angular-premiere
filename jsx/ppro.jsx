@@ -1,21 +1,3 @@
-function log(message) {
-  var now = new Date();
-  var monthValue = now.getMonth() + 1;
-  var timeFormat = now.getFullYear() + "/" + monthValue + "/" + now.getDate() + "-" + now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds();
-
-  var logFile = new File("/tmp/ppro.txt");
-
-  if (!logFile.exists) {
-    logFile.open('w');
-  } else {
-    logFile.open('a');
-  }
-
-  var messageToWrite = timeFormat + ": " + message;
-  logFile.writeln(messageToWrite);
-  logFile.close();
-}
-
 function renderSequence(presetPath, outputPath) {
   app.enableQE();
   var jobID = undefined;
