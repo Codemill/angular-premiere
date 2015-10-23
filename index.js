@@ -19,7 +19,7 @@ angular.module('codemill.premiere', ['codemill.adobe'])
       }
 
       function getActiveSequence() {
-        return { method : 'getActiveSequence', returnIsObject : true };
+        return { method : 'getActiveSequence', returnsObject : true };
       }
 
       function clearSequenceMarkers() {

@@ -118,7 +118,7 @@ describe('codemill.premiere.cmPremiereService', function () {
     expect(spy.callCS.calls.mostRecent().args[0].method).toBe(method);
     compareObject(spy.callCS.calls.mostRecent().args[0].args, args);
     if (isObject) {
-      expect(spy.callCS.calls.mostRecent().args[0].returnIsObject).toBe(true);
+      expect(spy.callCS.calls.mostRecent().args[0].returnsObject).toBe(true);
     }
     spy.callCS.calls.reset();
     var p = promise.callCS;
